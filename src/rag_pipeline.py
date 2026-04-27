@@ -14,7 +14,7 @@ def ask(question: str):
     text = load_document(file_path)
 
     # 2. chunk
-    chunks = split_text(text, chunk_size=200, overlap=50)
+    chunks = split_text(text, chunk_size=200)
 
     # 3. embed
     embedder = Embedder()

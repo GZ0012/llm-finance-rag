@@ -3,9 +3,7 @@
 from pathlib import Path
 from docx import Document
 
-
-def load_docx(file_path: str) -> str:
-
+def load_document(file_path: str) -> list[str]:
     path = Path(file_path)
 
     if not path.exists():
@@ -16,12 +14,12 @@ def load_docx(file_path: str) -> str:
 
     doc = Document(file_path)
 
-    texts = []
+    paragraphs = []
 
     for para in doc.paragraphs:
         text = para.text.strip()
         if text:
-            texts.append(text)
+            paragraphs.append(text)
 
     for table in doc.tables:
         for row in table.rows:
@@ -32,22 +30,8 @@ def load_docx(file_path: str) -> str:
                     row_text.append(cell_text)
 
             if row_text:
-                texts.append(" | ".join(row_text))
+                paragraphs.append(" | ".join(row_text))
 
-    return "\n".join(texts)
-
-def load_document(file_path: str) -> str:
-    return load_docx(file_path)
+    return paragraphs
 
 
-if __name__ == "__main__":
-    file_path = "data/Microsoft/PressReleaseFY26Q1.docx"
-
-    text = load_docx(file_path)
-
-    print("Loaded document successfully.")
-    print(f"Total characters: {len(text)}")
-    print("\nPreview:")
-    print(text[:1000])
-    
-    

@@ -14,20 +14,13 @@ Instead of sending entire documents to an LLM, the system retrieves only the mos
 
 ## Architecture
 
-Document (DOCX/PDF)
-↓
-Loader (extract text)
-↓
-Chunker (split into segments)
-↓
-Embedding Model (Sentence Transformers)
-↓
-FAISS Vector Index
-↓
-Retriever (Top-K similar chunks)
-↓
-LLM (GPT)
-↓
+Document (DOCX/PDF) to
+Loader (extract text) to
+Chunker (split into segments) to
+Embedding Model (Sentence Transformers) to
+FAISS Vector Index to
+Retriever (Top-K similar chunks) to
+LLM (GPT) to
 Final Answer
 
 ---
@@ -83,3 +76,5 @@ Microsoft reported revenue of $77.7 billion for the quarter.
 - OpenAI API
 - NumPy
 
+## Chunker Update
+Implemented adaptive semantic chunking that derives target chunk counts from desired token size and enforces upper bounds via recursive splitting at weakest semantic boundaries.
