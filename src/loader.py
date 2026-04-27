@@ -36,6 +36,9 @@ def load_docx(file_path: str) -> str:
 
     return "\n".join(texts)
 
+def load_document(file_path: str) -> str:
+    return load_docx(file_path)
+
 
 if __name__ == "__main__":
     file_path = "data/Microsoft/PressReleaseFY26Q1.docx"
@@ -46,3 +49,5 @@ if __name__ == "__main__":
     print(f"Total characters: {len(text)}")
     print("\nPreview:")
     print(text[:1000])
+    
+    

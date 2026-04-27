@@ -9,6 +9,7 @@ def split_text(text: str, chunk_size: int = 200, overlap: int = 50) -> List[str]
 
     Returns:
         A list of text chunks.
+        
     """
     if not text or not text.strip():
         return []

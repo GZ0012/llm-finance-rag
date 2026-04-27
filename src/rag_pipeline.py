@@ -1,31 +1,40 @@
-from docx import Document
-from sentence_transformers import SentenceTransformer
-import numpy as np
+# src/rag_pipeline.py
 
-file_path = "data/Microsoft/PressReleaseFY26Q1.docx"
-
-doc = Document(file_path)
-
-paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-msft_text = "\n".join(paragraphs)
-
-def split_text(text, chunk_size=200):
-    words = text.split()
-    chunks = []
-
-    for i in range(0, len(words), chunk_size):
-        chunk = " ".join(words[i:i+chunk_size])
-        chunks.append(chunk)
-
-    return chunks
+from loader import load_document
+from chunker import split_text
+from embedder import Embedder
+from retriever import Retriever
+from llm_client import ask_llm
 
 
-chunks = split_text(msft_text)
+def ask(question: str):
+    file_path = "data/Microsoft/PressReleaseFY26Q1.docx"
 
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-chunk_embeddings = embedding_model.encode(chunks)
+    # 1. load
+    text = load_document(file_path)
 
-print(f"Embedding shape: {chunk_embeddings.shape}")
-print(chunk_embeddings[0][:10])
-    
-    
+    # 2. chunk
+    chunks = split_text(text, chunk_size=200, overlap=50)
+
+    # 3. embed
+    embedder = Embedder()
+    chunk_embeddings = embedder.encode(chunks)
+
+    # 4. retrieve
+    retriever = Retriever(chunk_embeddings)
+    query_embedding = embedder.encode([question])
+    _, indices = retriever.search(query_embedding, top_k=3)
+
+    # 5. build context
+    retrieved_chunks = [chunks[i] for i in indices[0]]
+    context = "\n\n".join(retrieved_chunks)
+
+    # 6. LLM
+    answer = ask_llm(context, question)
+
+    return answer
+
+
+if __name__ == "__main__":
+    question = "What was Microsoft's total revenue for the quarter ended September 30, 2025?"
+    print(ask(question))
