@@ -107,3 +107,69 @@ Chunks that are far from their cluster center (potential outliers) get slightly 
 
 Since financial reports are usually pretty clean, I keep the weight range tight to avoid overcorrecting.
 
+
+## 🚀 Recent Updates (Persistent RAG System)
+
+This project has been upgraded from a simple single-file RAG prototype to a more scalable and structured Retrieval-Augmented Generation (RAG) system.
+
+### 🧠 Key Improvements
+
+#### 1. Document-Level Chunk Management
+- Documents placed in `data/` are automatically processed using the `/update document` command.
+- Each document is independently chunked and stored as: chunk/<document_name>_chunked.pkl
+- This design ensures that each document can be queried independently, avoiding cross-document interference.
+
+---
+
+#### 2. Embedding Caching (Performance Optimization)
+- Chunk embeddings are computed **only once** during the update phase.
+- Stored together with chunk metadata in `.pkl` files.
+- During query time: Only the user question is embedded
+- This significantly reduces latency and makes the system scalable.
+
+---
+
+#### 3. Interactive TUI (Text-Based Interface)
+
+The system includes a lightweight terminal-based UI:
+
+```bash
+python src/chatui.py
+```
+Supported commands:
+- /update document   # Process new files in data/
+- /docs              # List available documents
+- /use 1             # Select a document
+- /k 5               # Set retrieval depth (top-k)
+- /record            # Show session record file
+
+#### 4. Source Attribution (Explainability)
+
+Each answer includes retrieved chunk references:
+
+[1] Revenue was $77.7 billion...
+[2] Microsoft Cloud revenue...
+Improves transparency
+Allows users to trace model outputs back to source text
+
+#### 5. Session Recording (Traceability)
+
+Each chat session is saved as a structured Markdown file:
+
+records/rag_session_YYYYMMDD_HHMMSS.md
+
+Each entry contains:
+
+- Question
+- Selected Document
+- Answer
+- Retrieved Chunks (Top-k)
+
+This enables:
+
+Reproducibility
+Debugging
+Experiment tracking
+
+
+

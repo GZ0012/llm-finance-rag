@@ -1,40 +1,61 @@
 # src/rag_pipeline.py
 
-from loader import load_document
-from chunker import split_text
 from embedder import Embedder
 from retriever import Retriever
 from llm_client import ask_llm
+from document_manager import load_chunked_document
 
 
-def ask(question: str):
-    file_path = "data/Microsoft/PressReleaseFY26Q1.docx"
+def ask(question: str, chunk_path: str, top_k: int = 5):
+    """
+    Ask a question under one selected chunked document.
 
-    # 1. load
-    text = load_document(file_path)
+    This function does NOT re-chunk or re-embed the document.
+    It only:
+    1. loads precomputed chunks + embeddings
+    2. embeds the user question once
+    3. retrieves top_k chunks
+    4. sends context to LLM
+    """
 
-    # 2. chunk
-    chunks = split_text(text, chunk_size=200, max_multiplier=3)
+    # 1. load precomputed chunk file
+    data = load_chunked_document(chunk_path)
 
-    # 3. embed
+    chunks = data["chunks"]
+    chunk_embeddings = data["embeddings"]
+    source_file = data["source_file"]
+
+    # 2. embed question only once
     embedder = Embedder()
-    chunk_embeddings = embedder.encode(chunks)
-
-    # 4. retrieve
-    retriever = Retriever(chunk_embeddings)
     query_embedding = embedder.encode([question])
-    _, indices = retriever.search(query_embedding, top_k=10)
 
-    # 5. build context
-    retrieved_chunks = [chunks[i] for i in indices[0]]
-    context = "\n\n".join(retrieved_chunks)
+    # 3. retrieve from saved chunk embeddings
+    retriever = Retriever(chunk_embeddings)
+    _, indices = retriever.search(query_embedding, top_k)
 
-    # 6. LLM
+    # 4. prepare retrieved chunks
+    retrieved_chunks = []
+
+    for rank, i in enumerate(indices[0], start=1):
+        i = int(i)
+        text = chunks[i].strip().replace("\n", " ")
+        preview = " ".join(text.split()[:8])
+
+        retrieved_chunks.append({
+            "rank": rank,
+            "source_file": source_file,
+            "chunk_id": i,
+            "preview": preview,
+            "text": text
+        })
+
+    # 5. build context for LLM
+    context = "\n\n".join(
+        f"[Source {item['rank']} | Chunk {item['chunk_id']}]\n{item['text']}"
+        for item in retrieved_chunks
+    )
+
+    # 6. ask LLM
     answer = ask_llm(context, question)
 
-    return answer
-
-
-if __name__ == "__main__":
-    question = "what was the revenue of microsoft this quater"
-    print(ask(question))
+    return answer, retrieved_chunks

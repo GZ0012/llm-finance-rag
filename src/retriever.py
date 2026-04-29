@@ -91,7 +91,6 @@ class Retriever:
 
         return final_scores, final_indices
 
-
 if __name__ == "__main__":
     from loader import load_document
     from chunker import split_text
