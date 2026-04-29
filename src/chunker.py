@@ -140,7 +140,6 @@ def split_oversized_chunks(
             start = chunk["paragraph_start"]
             end = chunk["paragraph_end"]
 
-            # Cannot split a single paragraph further
             if start >= end:
                 continue
 

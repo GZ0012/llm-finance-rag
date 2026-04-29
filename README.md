@@ -14,14 +14,13 @@ Instead of sending entire documents to an LLM, the system retrieves only the mos
 
 ## Architecture
 
-Document (DOCX/PDF) to
-Loader (extract text) to
-Chunker (split into segments) to
-Embedding Model (Sentence Transformers) to
-FAISS Vector Index to
-Retriever (Top-K similar chunks) to
-LLM (GPT) to
-Final Answer
+→ Loader: extracts paragraphs and tables
+→ Chunker: semantic chunking with adaptive size control
+→ Embedding Model: converts chunks into vector representations
+→ FAISS Vector Index: stores searchable chunk embeddings
+→ Retriever: retrieves top-k chunks and applies density-based reranking
+→ LLM: generates grounded answers from retrieved context
+→ Final Answer
 
 ---
 
@@ -76,5 +75,35 @@ Microsoft reported revenue of $77.7 billion for the quarter.
 - OpenAI API
 - NumPy
 
-## Chunker Update
-Implemented adaptive semantic chunking that derives target chunk counts from desired token size and enforces upper bounds via recursive splitting at weakest semantic boundaries.
+## chunker update
+
+Problem:
+Splitting text purely by character count is pretty unreliable. It can break important context across chunks, which leads to weaker retrieval and sometimes inaccurate answers—even if FAISS finds the “right” place.
+
+Solution:
+Instead of splitting by size, I first embed each paragraph and look at the cosine similarity between adjacent paragraphs.
+
+To split a document into k chunks, I find the k-1 points where similarity drops the most and split there.
+
+This way, chunks are separated based on actual semantic boundaries, not arbitrary length, which helps keep each chunk more self-contained and contextually consistent.
+
+
+## outlier update
+Problem:
+When using semantic chunking, noise (e.g. something like “I am noise” inside a financial report) often gets isolated into its own chunk. While that’s actually correct behavior, it can still mess with retrieval if treated equally.
+
+Solution:
+I keep the similarity-based chunking (since it already isolates noise well), and instead handle noise during retrieval.
+
+To avoid removing useful but rare information, I don’t filter anything out. Instead, I:
+
+- Use KMeans clustering to group semantically similar chunks
+- Use an elbow method to estimate a reasonable number of clusters
+- Measure how far each chunk is from its cluster center
+- Convert that into a soft weight using percentile ranking
+- weight = max_weight - percentile * (max_weight - min_weight)
+
+Chunks that are far from their cluster center (potential outliers) get slightly downweighted, while more “typical” chunks are preserved.
+
+Since financial reports are usually pretty clean, I keep the weight range tight to avoid overcorrecting.
+

@@ -14,7 +14,7 @@ def ask(question: str):
     text = load_document(file_path)
 
     # 2. chunk
-    chunks = split_text(text, chunk_size=200)
+    chunks = split_text(text, chunk_size=200, max_multiplier=3)
 
     # 3. embed
     embedder = Embedder()
@@ -23,7 +23,7 @@ def ask(question: str):
     # 4. retrieve
     retriever = Retriever(chunk_embeddings)
     query_embedding = embedder.encode([question])
-    _, indices = retriever.search(query_embedding, top_k=3)
+    _, indices = retriever.search(query_embedding, top_k=10)
 
     # 5. build context
     retrieved_chunks = [chunks[i] for i in indices[0]]
@@ -36,5 +36,5 @@ def ask(question: str):
 
 
 if __name__ == "__main__":
-    question = "What was Microsoft's total revenue for the quarter ended September 30, 2025?"
+    question = "what was the revenue of microsoft this quater"
     print(ask(question))
