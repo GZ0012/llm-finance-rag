@@ -7,7 +7,9 @@ from rag_pipeline import ask
 from document_manager import update_documents, list_chunked_documents
 
 
-RECORD_DIR = Path("records")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+RECORD_DIR = PROJECT_ROOT / "records"
 RECORD_DIR.mkdir(exist_ok=True)
 
 

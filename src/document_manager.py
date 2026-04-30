@@ -8,9 +8,12 @@ from chunker import split_text
 from embedder import Embedder
 
 
-DATA_DIR = Path("/Users/garyzhou/github/llm-finance-rag/data")
-CHUNK_DIR = Path("/Users/garyzhou/github/llm-finance-rag/chunk")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+DATA_DIR = PROJECT_ROOT / "data"
+CHUNK_DIR = PROJECT_ROOT / "chunk"
 CHUNK_DIR.mkdir(exist_ok=True)
+
 
 SUPPORTED_EXTENSIONS = {".txt", ".pdf", ".docx", ".md"}
 
