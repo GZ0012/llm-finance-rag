@@ -63,6 +63,7 @@ Commands:
   /docs                Show available documents
   /use 1               Select document
   /k 5                 Set top_k default 5
+  /prompt role|cot|fewshot   Set prompt type
   /record              Show current record file
   /help                Show commands
   exit                 Quit
@@ -87,6 +88,7 @@ def main():
 
     top_k = 5
     current_doc = None
+    prompt_type = "role"
 
     while True:
         user_input = input("\n> ").strip()
@@ -147,6 +149,20 @@ def main():
                 print("Usage: /k 5")
             continue
 
+        if user_input.startswith("/prompt"):
+            try:
+                prompt_type = user_input.split()[1]
+
+                if prompt_type not in ["role", "cot", "fewshot"]:
+                    print("Usage: /prompt role | cot | fewshot")
+                    continue
+
+                print(f"prompt_type = {prompt_type}")
+
+            except Exception:
+                print("Usage: /prompt role | cot | fewshot")
+            continue
+
         if not user_input:
             continue
 
@@ -158,7 +174,8 @@ def main():
             answer, sources = ask(
                 question=user_input,
                 chunk_path=current_doc["chunk_path"],
-                top_k=top_k
+                top_k=top_k,
+                prompt_type=prompt_type
             )
 
             print("\nAnswer:")

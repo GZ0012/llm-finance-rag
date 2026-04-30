@@ -108,12 +108,6 @@ Chunks that are far from their cluster center (potential outliers) get slightly 
 Since financial reports are usually pretty clean, I keep the weight range tight to avoid overcorrecting.
 
 
-## 🚀 Recent Updates (Persistent RAG System)
-
-This project has been upgraded from a simple single-file RAG prototype to a more scalable and structured Retrieval-Augmented Generation (RAG) system.
-
-### 🧠 Key Improvements
-
 #### 1. Document-Level Chunk Management
 - Documents placed in `data/` are automatically processed using the `/update document` command.
 - Each document is independently chunked and stored as: chunk/<document_name>_chunked.pkl
@@ -171,5 +165,25 @@ Reproducibility
 Debugging
 Experiment tracking
 
+##  Recent Update: Prompt System + Persistent RAG
 
+This update introduces a more modular and production-style RAG architecture with prompt flexibility and improved system design.
 
+### 🧠 Prompt System (CoT / Role / Few-shot)
+
+- Prompts are no longer hardcoded in Python
+- Moved to `src/prompts/*.md` for better modularity
+- Supported prompt types:
+
+```text
+role     → standard role-based QA
+cot      → chain-of-thought style (hidden reasoning)
+fewshot  → example-driven prompting
+```
+
+Switch prompts dynamically in TUI:
+/prompt role
+/prompt cot
+/prompt fewshot
+
+---

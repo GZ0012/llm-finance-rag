@@ -6,7 +6,12 @@ from llm_client import ask_llm
 from document_manager import load_chunked_document
 
 
-def ask(question: str, chunk_path: str, top_k: int = 5):
+def ask(
+    question: str,
+    chunk_path: str,
+    top_k: int = 5,
+    prompt_type: str = "role"
+):
     """
     Ask a question under one selected chunked document.
 
@@ -55,7 +60,11 @@ def ask(question: str, chunk_path: str, top_k: int = 5):
         for item in retrieved_chunks
     )
 
-    # 6. ask LLM
-    answer = ask_llm(context, question)
+    # 6. ask LLM with selected prompt type
+    answer = ask_llm(
+        context=context,
+        question=question,
+        prompt_type=prompt_type
+    )
 
     return answer, retrieved_chunks

@@ -1,35 +1,39 @@
-# src/llm_client.py
-
+from pathlib import Path
 from openai import OpenAI
 from config import config
 
 client = OpenAI(api_key=config.OPENAI_API_KEY)
 
-
-def build_prompt(context: str, question: str) -> str:
-    return f"""
-You are a financial analyst assistant.
-
-Answer the question ONLY based on the context below.
-If the answer is not in the context, say "I don't know".
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer:
-"""
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROMPT_DIR = PROJECT_ROOT / "src" / "prompts"
 
 
-def ask_llm(context: str, question: str) -> str:
-    prompt = build_prompt(context, question)
+def load_prompt_template(prompt_type: str) -> str:
+    path = PROMPT_DIR / f"{prompt_type}.md"
+
+    if not path.exists():
+        raise ValueError(f"Prompt not found: {prompt_type}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def build_prompt(context: str, question: str, prompt_type: str) -> str:
+    template = load_prompt_template(prompt_type)
+
+    prompt = template.replace("{{context}}", context)
+    prompt = prompt.replace("{{question}}", question)
+
+    return prompt
+
+
+def ask_llm(context: str, question: str, prompt_type: str = "role") -> str: #"role", "cot", "fewshot"
+    prompt = build_prompt(context, question, prompt_type)
 
     response = client.chat.completions.create(
         model=config.MODEL_NAME,
         messages=[
-            {"role": "system", "content": "You are a helpful financial assistant."},
+            {"role": "system", "content": "You are a financial assistant."},
             {"role": "user", "content": prompt}
         ],
         temperature=0
