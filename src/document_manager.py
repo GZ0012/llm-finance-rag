@@ -4,8 +4,9 @@ from pathlib import Path
 import pickle
 
 from loader import load_document
-from chunker import split_text
+from chunker import split_text, auto_chunk_size, estimate_tokens
 from embedder import Embedder
+from llm_client import generate_summary
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,14 @@ CHUNK_DIR.mkdir(exist_ok=True)
 
 
 SUPPORTED_EXTENSIONS = {".txt", ".pdf", ".docx", ".md"}
+
+# Human-readable label for each supported extension, shown at processing time.
+EXTENSION_LABELS = {
+    ".pdf":  "PDF",
+    ".docx": "Word Document",
+    ".txt":  "Plain Text",
+    ".md":   "Markdown",
+}
 
 
 def get_chunk_path(file_path: Path) -> Path:
@@ -28,7 +37,9 @@ def update_documents():
     embedder = Embedder()
 
     for file_path in DATA_DIR.rglob("*"):
-        if file_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+        suffix = file_path.suffix.lower()
+
+        if suffix not in SUPPORTED_EXTENSIONS:
             continue
 
         chunk_path = get_chunk_path(file_path)
@@ -36,17 +47,41 @@ def update_documents():
         if chunk_path.exists():
             continue
 
-        print(f"Processing: {file_path.name}")
+        # Auto-detect file type and log it before any heavy work begins,
+        # so you can confirm the right loader will be used.
+        doc_type = EXTENSION_LABELS.get(suffix, suffix)
+        print(f"Detected [{doc_type}]: {file_path.name}")
 
         text = load_document(str(file_path))
-        chunks = split_text(text, chunk_size=100, max_multiplier=2.5) #This is the size setting
+
+        # Estimate total document tokens before chunking so auto_chunk_size
+        # can pick an appropriate chunk size for this specific document.
+        paragraphs = text if isinstance(text, list) else text.split("\n")
+        total_tokens = sum(estimate_tokens(p) for p in paragraphs if p.strip())
+
+        # Auto-select chunk size based on document length (sqrt heuristic).
+        # Stored in chunk_data so you can inspect it later with /docs.
+        chunk_size = auto_chunk_size(total_tokens)
+        print(f"  total_tokens={total_tokens}  →  auto chunk_size={chunk_size}")
+
+        chunks = split_text(text, chunk_size=chunk_size, max_multiplier=2.5)
         embeddings = embedder.encode(chunks)
+
+        # Generate a full-document summary once at index time so global
+        # queries ("summarize this", "what is this document about") can be
+        # answered without retrieval — just the stored summary as context.
+        print(f"  Generating document summary...")
+        summary = generate_summary(chunks)
 
         chunk_data = {
             "source_file": str(file_path),
             "file_name": file_path.name,
+            "doc_type": doc_type,
             "chunks": chunks,
             "embeddings": embeddings,
+            "chunk_size": chunk_size,   # saved so you can audit the decision later
+            "total_tokens": total_tokens,
+            "summary": summary,
         }
 
         with open(chunk_path, "wb") as f:

@@ -59,7 +59,7 @@ def close_record(record_path):
 def print_help():
     print("""
 Commands:
-  /update document     Chunk + embed new documents
+  /update document     Scan data/ folder for new .pdf/.docx/.txt/.md files and chunk them
   /docs                Show available documents
   /use 1               Select document
   /k 5                 Set top_k default 5
@@ -111,11 +111,11 @@ def main():
             updated = update_documents()
 
             if updated:
-                print("\nUpdated documents:")
+                print("\nChunked and embedded:")
                 for name in updated:
-                    print(f"- {name}")
+                    print(f"  - {name}")
             else:
-                print("\nNo new documents found.")
+                print("\nNo new files found in data/. Add .pdf/.docx/.txt/.md files there first.")
             continue
 
         if user_input == "/docs":

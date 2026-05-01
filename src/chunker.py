@@ -1,5 +1,6 @@
 # src/chunker.py
 
+import math
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from embedder import Embedder
@@ -11,6 +12,48 @@ def estimate_tokens(text: str) -> int:
     1 token is approximately 4 English characters.
     """
     return max(1, len(text) // 4)
+
+
+def auto_chunk_size(
+    total_tokens: int,
+    top_k: int = 5,
+    max_context_tokens: int = 3000
+) -> int:
+    """
+    Auto-detect chunk size based on document length.
+
+    Uses the square-root law from information retrieval:
+      chunk_size ≈ sqrt(total_tokens)
+
+    This produces roughly sqrt(N) chunks from N tokens, which
+    balances two competing pressures:
+      - Too small → chunks lose coherence (a metric split from its label)
+      - Too large → retrieval is imprecise (too much noise per chunk)
+
+    A second ceiling ensures that top_k retrieved chunks
+    always fit within the LLM's usable context window.
+    """
+
+    # Square-root heuristic: targets ~sqrt(total_tokens) total chunks.
+    # Derivation: if chunk_size = sqrt(N), then N / chunk_size = sqrt(N) chunks.
+    natural_size = int(math.sqrt(total_tokens))
+
+    # LLM context ceiling: prevent top_k * chunk_size from overflowing the prompt.
+    # e.g. top_k=5, max_context_tokens=3000 → each chunk capped at 600 tokens.
+    context_ceiling = max_context_tokens // max(1, top_k)
+
+    # Hard lower bound: financial sentences need ~80 tokens to stay coherent
+    # (a single earnings metric with its label, units, and YoY comparison).
+    MIN_CHUNK = 80
+
+    # Hard upper bound: above ~512 tokens, retrieved chunks carry too much
+    # off-topic content, which degrades LLM answer quality.
+    MAX_CHUNK = 512
+
+    size = min(natural_size, context_ceiling, MAX_CHUNK)
+    size = max(size, MIN_CHUNK)
+
+    return size
 
 
 def normalize_input(text):

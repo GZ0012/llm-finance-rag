@@ -27,7 +27,7 @@ def build_prompt(context: str, question: str, prompt_type: str) -> str:
     return prompt
 
 
-def ask_llm(context: str, question: str, prompt_type: str = "role") -> str: #"role", "cot", "fewshot"
+def ask_llm(context: str, question: str, prompt_type: str = "role") -> str: #"role", "cot", "fewshot", "global"
     prompt = build_prompt(context, question, prompt_type)
 
     response = client.chat.completions.create(
@@ -36,6 +36,39 @@ def ask_llm(context: str, question: str, prompt_type: str = "role") -> str: #"ro
             {"role": "system", "content": "You are a financial assistant."},
             {"role": "user", "content": prompt}
         ],
+        temperature=0
+    )
+
+    return response.choices[0].message.content
+
+
+def generate_summary(chunks: list, max_context_chars: int = 24000) -> str:
+    """
+    Summarize a document from its chunks at indexing time.
+
+    Joins chunks up to max_context_chars so the summary prompt doesn't
+    overflow the LLM's context window. For most financial press releases
+    and earnings transcripts this limit is never hit.
+    """
+    joined = "\n\n".join(chunks)
+
+    # Truncate if the document is very long (e.g. annual reports / 10-Ks).
+    if len(joined) > max_context_chars:
+        joined = joined[:max_context_chars] + "\n\n[document truncated]"
+
+    prompt = (
+        "You are a professional financial analyst.\n"
+        "Read the following document and write a structured summary that covers:\n"
+        "- The company and reporting period\n"
+        "- Key financial results (revenue, profit, growth rates)\n"
+        "- Major business highlights and segment performance\n"
+        "- Forward-looking statements or guidance\n\n"
+        f"{joined}\n\nSummary:"
+    )
+
+    response = client.chat.completions.create(
+        model=config.MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
 

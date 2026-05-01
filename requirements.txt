@@ -3,3 +3,4 @@ sentence-transformers
 openai
 python-dotenv
 python-docx
+pdfplumber
