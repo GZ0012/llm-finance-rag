@@ -7,6 +7,7 @@ from loader import load_document
 from chunker import split_text, auto_chunk_size, estimate_tokens
 from embedder import Embedder
 from llm_client import generate_summary
+from vector_store import VectorStore
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,8 @@ def update_documents():
     updated = []
 
     embedder = Embedder()
+    # Load (or create) the shared vector store once for this update run.
+    vector_store = VectorStore()
 
     for file_path in DATA_DIR.rglob("*"):
         suffix = file_path.suffix.lower()
@@ -44,7 +47,8 @@ def update_documents():
 
         chunk_path = get_chunk_path(file_path)
 
-        if chunk_path.exists():
+        # Skip if both the pkl and the vector store already have this document.
+        if chunk_path.exists() and vector_store.has_document(file_path.name):
             continue
 
         # Auto-detect file type and log it before any heavy work begins,
@@ -79,13 +83,29 @@ def update_documents():
             "doc_type": doc_type,
             "chunks": chunks,
             "embeddings": embeddings,
-            "chunk_size": chunk_size,   # saved so you can audit the decision later
+            "chunk_size": chunk_size,
             "total_tokens": total_tokens,
             "summary": summary,
         }
 
         with open(chunk_path, "wb") as f:
             pickle.dump(chunk_data, f)
+
+        # Add this document's embeddings to the shared vector store.
+        # Metadata stored per-vector so search results are self-contained
+        # (no need to reload the pkl just to get chunk text at query time).
+        metadata = [
+            {
+                "doc_name": file_path.name,
+                "source_file": str(file_path),
+                "chunk_id": i,
+                "text": chunk,
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+        vector_store.add(embeddings, metadata)
+        vector_store.save()
+        print(f"  Added {len(chunks)} vectors to store (total: {vector_store.total_vectors})")
 
         updated.append(file_path.name)
 

@@ -1,9 +1,9 @@
 # src/rag_pipeline.py
 
 from embedder import Embedder
-from retriever import Retriever
 from llm_client import ask_llm
 from document_manager import load_chunked_document
+from vector_store import VectorStore
 
 
 # Keywords that signal the user wants a broad/overview answer rather than
@@ -60,67 +60,52 @@ def ask(
     prompt_type: str = "role"
 ):
     """
-    Ask a question under one selected chunked document.
+    Ask a question against one selected document.
 
-    This function does NOT re-chunk or re-embed the document.
-    It only:
-    1. loads precomputed chunks + embeddings
-    2. embeds the user question once
-    3. retrieves top_k chunks
-    4. sends context to LLM
+    Uses the shared VectorStore (persistent FAISS index) for retrieval —
+    no per-query index rebuild. The pkl is only loaded for the summary
+    (global queries) and the doc_name filter.
     """
 
-    # 1. load precomputed chunk file
+    # 1. load the pkl for summary and doc name (no longer needed for embeddings)
     data = load_chunked_document(chunk_path)
+    doc_name = data["file_name"]
 
-    chunks = data["chunks"]
-    chunk_embeddings = data["embeddings"]
-    source_file = data["source_file"]
-
-    # 2. Global path: if the question is broad/overview, skip retrieval and
-    #    answer directly from the pre-generated document summary.
-    #    Returns empty sources list since no specific chunks were retrieved.
+    # 2. Global path: broad/overview questions use the stored summary directly,
+    #    skipping retrieval entirely.
     if is_global_query(question):
         summary = data.get("summary")
         if summary:
             answer = ask_llm(context=summary, question=question, prompt_type="global")
             return answer, []
 
-    # 3. embed question only once
+    # 3. Embed the query once, then search the shared vector store.
+    #    Filtering by doc_name scopes results to the selected document.
     embedder = Embedder()
     query_embedding = embedder.encode([question])
 
-    # 4. retrieve from saved chunk embeddings
-    retriever = Retriever(chunk_embeddings)
-    _, indices = retriever.search(query_embedding, top_k)
+    vector_store = VectorStore()
+    results = vector_store.search(query_embedding, top_k=top_k, doc_name=doc_name)
 
-    # 4. prepare retrieved chunks
+    # 4. Build retrieved_chunks in the format the rest of the pipeline expects.
     retrieved_chunks = []
-
-    for rank, i in enumerate(indices[0], start=1):
-        i = int(i)
-        text = chunks[i].strip().replace("\n", " ")
-        preview = " ".join(text.split()[:8])
-
+    for rank, r in enumerate(results, start=1):
+        text = r["text"].strip().replace("\n", " ")
         retrieved_chunks.append({
             "rank": rank,
-            "source_file": source_file,
-            "chunk_id": i,
-            "preview": preview,
-            "text": text
+            "source_file": r["source_file"],
+            "chunk_id": r["chunk_id"],
+            "preview": " ".join(text.split()[:8]),
+            "text": text,
         })
 
-    # 5. build context for LLM
+    # 5. Build context string for the LLM
     context = "\n\n".join(
         f"[Source {item['rank']} | Chunk {item['chunk_id']}]\n{item['text']}"
         for item in retrieved_chunks
     )
 
-    # 6. ask LLM with selected prompt type
-    answer = ask_llm(
-        context=context,
-        question=question,
-        prompt_type=prompt_type
-    )
+    # 6. Ask LLM with the selected prompt type
+    answer = ask_llm(context=context, question=question, prompt_type=prompt_type)
 
     return answer, retrieved_chunks
