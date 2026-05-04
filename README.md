@@ -7,12 +7,12 @@ A RAG pipeline for natural language Q&A over financial documents (earnings repor
 ## Architecture
 
 ```
-Loader → Chunker → Embedder → FAISS Index → Retriever → LLM → Answer
+Loader → Chunker → Embedder → VectorStore (persistent FAISS) → LLM → Answer
 ```
 
 - **Loader** — extracts paragraphs and tables from `.pdf`, `.docx`, `.txt`, `.md`
 - **Chunker** — semantic chunking at cosine-similarity boundaries with auto chunk sizing
-- **Retriever** — FAISS top-k search with KMeans-based outlier downweighting
+- **VectorStore** — shared persistent FAISS index across all documents; searched directly at query time, no per-query rebuild
 - **LLM** — OpenAI model with modular prompt templates (role / CoT / few-shot / global)
 
 ---
@@ -68,7 +68,7 @@ exit               Quit
 
 **Outlier-aware retrieval** — uses KMeans clustering on chunk embeddings to softly downweight chunks that are far from their cluster center (`weight = max - percentile × range`), reducing noise without discarding rare but valid content.
 
-**Embedding caching** — embeddings are computed once at index time and stored in `.pkl` files. Only the query is embedded at runtime.
+**Persistent vector store** — embeddings are computed once at index time and written to `vector_store/index.faiss` + `vector_store/meta.json`. At query time only the query is embedded; the FAISS index is loaded from disk and searched directly — no per-query rebuild.
 
 **Session recording** — each chat session is saved to `records/rag_session_YYYYMMDD_HHMMSS.md` with question, answer, document, and retrieved chunks for reproducibility and debugging.
 
@@ -167,5 +167,42 @@ User: "how much did cloud revenue grow?"    → Local path  (retrieval)
 ```
 
 No user action required — routing is fully automatic.
+
+---
+
+## Recent Update: Persistent Vector Store
+
+### Problem
+
+Previously the FAISS index was rebuilt from scratch on every query — loading all embeddings from the `.pkl` file, running KMeans clustering, then searching. This meant latency scaled with document size and made cross-document search impossible.
+
+### Solution
+
+A shared `VectorStore` class backed by a persistent FAISS flat index:
+
+```
+vector_store/
+  index.faiss   ← all chunk embeddings across all documents
+  meta.json     ← parallel metadata: chunk text, doc name, chunk id, source path
+```
+
+**At index time** (`/update document`): embeddings are added to the store and saved to disk once.
+
+**At query time**: the store is loaded and searched in one step — no rebuild, no KMeans.
+
+```python
+vector_store = VectorStore()
+results = vector_store.search(query_embedding, top_k=5, doc_name="report.pdf")
+```
+
+Passing `doc_name` filters results to the selected document. Omitting it searches across all documents (foundation for future multi-document Q&A).
+
+### Before vs After
+
+| | Before | After |
+|---|---|---|
+| Query latency | Rebuild FAISS + KMeans every call | Load index → search |
+| Cross-document | Not supported | `search()` without `doc_name` |
+| Storage | Embeddings duplicated in each `.pkl` | Single shared `index.faiss` |
 
 ---
